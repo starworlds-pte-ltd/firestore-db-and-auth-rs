@@ -10,6 +10,7 @@ use super::FirebaseAuthBearer;
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::{env, fmt};
 
 mod delete;
 mod list;
@@ -51,32 +52,60 @@ pub trait JoinableIterator: Iterator {
 
 impl<'a, VALUE> JoinableIterator for std::collections::hash_map::Keys<'a, String, VALUE> {}
 
+enum Scheme {
+    HTTPS,
+    HTTP,
+}
+
+impl fmt::Display for Scheme {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Scheme::HTTPS => write!(f, "https"),
+            Scheme::HTTP => write!(f, "http"),
+        }
+    }
+}
+
+#[inline]
+fn firebase_base_url() -> String {
+    match env::var("FIRESTORE_EMULATOR_HOST") {
+        Err(_) => format!("{}://{}", Scheme::HTTPS, "firestore.googleapis.com"),
+        Ok(host) => format!("{}://{}", Scheme::HTTP, host),
+    }
+}
+
 #[inline]
 fn firebase_url_query(v1: &str) -> String {
     format!(
-        "https://firestore.googleapis.com/v1/projects/{}/databases/(default)/documents:runQuery",
+        "{}/v1/projects/{}/databases/(default)/documents:runQuery",
+        firebase_base_url(),
         v1
     )
 }
 
 #[inline]
 fn firebase_url_base(v1: &str) -> String {
-    format!("https://firestore.googleapis.com/v1/{}", v1)
+    format!("{}/v1/{}", firebase_base_url(), v1)
 }
 
 #[inline]
 fn firebase_url_extended(v1: &str, v2: &str, v3: &str) -> String {
     format!(
-        "https://firestore.googleapis.com/v1/projects/{}/databases/(default)/documents/{}/{}",
-        v1, v2, v3
+        "{}/v1/projects/{}/databases/(default)/documents/{}/{}",
+        firebase_base_url(),
+        v1,
+        v2,
+        v3
     )
 }
 
 #[inline]
 fn firebase_url(v1: &str, v2: &str) -> String {
     format!(
-        "https://firestore.googleapis.com/v1/projects/{}/databases/(default)/documents/{}?",
-        v1, v2
+        "{}/v1/projects/{}/databases/(default)/documents/{}?",
+        firebase_base_url(),
+        v1,
+        v2
     )
 }
 
