@@ -31,14 +31,14 @@ where
 /// * 'auth' The authentication token
 /// * 'path' The document path / collection; For example "my_collection" or "a/nested/collection"
 /// * 'document_id' The document id. Make sure that you do not include the document id to the path argument.
-pub fn read<T>(auth: &impl FirebaseAuthBearer, path: &str, document_id: impl AsRef<str>) -> Result<T>
+pub fn read<T>(auth: &impl FirebaseAuthBearer, path: impl Into<String>, document_id: impl AsRef<str>) -> Result<T>
 where
     for<'b> T: Deserialize<'b>,
 {
     let document_name = format!(
         "projects/{}/databases/(default)/documents/{}/{}",
         auth.project_id(),
-        path,
+        path.into(),
         document_id.as_ref()
     );
     read_by_name(auth, &document_name)
