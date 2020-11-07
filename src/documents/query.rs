@@ -69,7 +69,7 @@ pub fn query(
     let resp = auth
         .client()
         .post(&url)
-        .bearer_auth(auth.access_token().to_owned())
+        .bearer_auth(auth.access_token().lock().unwrap().to_owned())
         .json(&query_request)
         .send()?;
 

@@ -11,7 +11,11 @@ use crate::errors::extract_google_api_error_async;
 /// * 'auth' The authentication token
 /// * 'path' The relative collection path and document id, for example "my_collection/document_id"
 /// * 'fail_if_not_existing' If true this method will return an error if the document does not exist.
-pub fn delete(auth: &impl FirebaseAuthBearer, path: &str, fail_if_not_existing: bool) -> Result<()> {
+pub fn delete(
+    auth: &impl FirebaseAuthBearer,
+    path: &str,
+    fail_if_not_existing: bool,
+) -> Result<()> {
     let url = firebase_url(auth.project_id(), path);
 
     let query_request = dto::Write {
@@ -28,7 +32,7 @@ pub fn delete(auth: &impl FirebaseAuthBearer, path: &str, fail_if_not_existing: 
     let resp = auth
         .client()
         .delete(&url)
-        .bearer_auth(auth.access_token().to_owned())
+        .bearer_auth(auth.access_token().lock().unwrap().to_owned())
         .json(&query_request)
         .send()?;
 
@@ -49,7 +53,11 @@ pub fn delete(auth: &impl FirebaseAuthBearer, path: &str, fail_if_not_existing: 
 /// * 'path' The relative collection path and document id, for example "my_collection/document_id"
 /// * 'fail_if_not_existing' If true this method will return an error if the document does not exist.
 #[cfg(feature = "unstable")]
-pub async fn delete_async(auth: &impl FirebaseAuthBearer, path: &str, fail_if_not_existing: bool) -> Result<()> {
+pub async fn delete_async(
+    auth: &impl FirebaseAuthBearer,
+    path: &str,
+    fail_if_not_existing: bool,
+) -> Result<()> {
     let url = firebase_url(auth.project_id(), path);
 
     let query_request = dto::Write {
@@ -66,7 +74,7 @@ pub async fn delete_async(auth: &impl FirebaseAuthBearer, path: &str, fail_if_no
     let resp = auth
         .client_async()
         .delete(&url)
-        .bearer_auth(auth.access_token().to_owned())
+        .bearer_auth(auth.access_token().lock().unwrap().to_owned())
         .json(&query_request)
         .send()
         .await?;

@@ -12,10 +12,12 @@ use crate::errors::FirebaseError;
 use biscuit::jwa::SignatureAlgorithm;
 use biscuit::{ClaimPresenceOptions, SingleOrMultiple, StringOrUri, ValidationOptions};
 use std::ops::Deref;
+use std::sync::{Arc, Mutex};
 
 type Error = super::errors::FirebaseError;
 
-pub static JWT_AUDIENCE_FIRESTORE: &str = "https://firestore.googleapis.com/google.firestore.v1.Firestore";
+pub static JWT_AUDIENCE_FIRESTORE: &str =
+    "https://firestore.googleapis.com/google.firestore.v1.Firestore";
 pub static JWT_AUDIENCE_IDENTITY: &str =
     "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit";
 
@@ -93,7 +95,10 @@ pub(crate) fn create_jwt_encoded<S: AsRef<str>>(
 /// Returns true if the access token (assumed to be a jwt) has expired
 ///
 /// An error is returned if the given access token string is not a jwt
-pub(crate) fn is_expired(access_token: &str, tolerance_in_minutes: i64) -> Result<bool, FirebaseError> {
+pub(crate) fn is_expired(
+    access_token: &str,
+    tolerance_in_minutes: i64,
+) -> Result<bool, FirebaseError> {
     let token = AuthClaimsJWT::new_encoded(&access_token);
     let claims = token.unverified_payload()?;
     if let Some(expiry) = claims.registered.expiry.as_ref() {
@@ -105,7 +110,8 @@ pub(crate) fn is_expired(access_token: &str, tolerance_in_minutes: i64) -> Resul
 }
 
 /// Returns true if the jwt was updated and needs signing
-pub(crate) fn jwt_update_expiry_if(jwt: &mut AuthClaimsJWT, expire_in_minutes: i64) -> bool {
+pub(crate) fn jwt_update_expiry_if(jwt: Arc<Mutex<AuthClaimsJWT>>, expire_in_minutes: i64) -> bool {
+    let mut jwt = jwt.lock().unwrap();
     let ref mut claims = jwt.payload_mut().unwrap().registered;
 
     let now = biscuit::Timestamp::from(Utc::now());

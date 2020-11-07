@@ -58,7 +58,10 @@ struct UserRequest {
 
 #[inline]
 fn firebase_auth_url(v: &str, v2: &str) -> String {
-    format!("https://identitytoolkit.googleapis.com/v1/accounts:{}?key={}", v, v2)
+    format!(
+        "https://identitytoolkit.googleapis.com/v1/accounts:{}?key={}",
+        v, v2
+    )
 }
 
 /// Retrieve information about the firebase auth user associated with the given user session
@@ -73,7 +76,9 @@ pub fn user_info(session: &user::Session) -> Result<FirebaseAuthUserResponse> {
         .client()
         .post(&url)
         .json(&UserRequest {
-            idToken: session.access_token(),
+            idToken: (*session.access_token().lock().unwrap().clone())
+                .parse()
+                .unwrap(),
         })
         .send()?;
 
@@ -93,7 +98,9 @@ pub fn user_remove(session: &user::Session) -> Result<()> {
         .client()
         .post(&url)
         .json(&UserRequest {
-            idToken: session.access_token(),
+            idToken: (*session.access_token().lock().unwrap().clone())
+                .parse()
+                .unwrap(),
         })
         .send()?;
 
@@ -117,7 +124,12 @@ struct SignInUpUserRequest {
     pub returnSecureToken: bool,
 }
 
-fn sign_up_in(session: &service_account::Session, email: &str, password: &str, action: &str) -> Result<user::Session> {
+fn sign_up_in(
+    session: &service_account::Session,
+    email: &str,
+    password: &str,
+    action: &str,
+) -> Result<user::Session> {
     let url = firebase_auth_url(action, &session.credentials.api_key);
     let resp = session
         .client()
@@ -148,7 +160,11 @@ fn sign_up_in(session: &service_account::Session, email: &str, password: &str, a
 /// EMAIL_EXISTS: The email address is already in use by another account.
 /// OPERATION_NOT_ALLOWED: Password sign-in is disabled for this project.
 /// TOO_MANY_ATTEMPTS_TRY_LATER: We have blocked all requests from this device due to unusual activity. Try again later.
-pub fn sign_up(session: &service_account::Session, email: &str, password: &str) -> Result<user::Session> {
+pub fn sign_up(
+    session: &service_account::Session,
+    email: &str,
+    password: &str,
+) -> Result<user::Session> {
     sign_up_in(session, email, password, "signUp")
 }
 
@@ -158,6 +174,10 @@ pub fn sign_up(session: &service_account::Session, email: &str, password: &str) 
 /// EMAIL_NOT_FOUND: There is no user record corresponding to this identifier. The user may have been deleted.
 /// INVALID_PASSWORD: The password is invalid or the user does not have a password.
 /// USER_DISABLED: The user account has been disabled by an administrator.
-pub fn sign_in(session: &service_account::Session, email: &str, password: &str) -> Result<user::Session> {
+pub fn sign_in(
+    session: &service_account::Session,
+    email: &str,
+    password: &str,
+) -> Result<user::Session> {
     sign_up_in(session, email, password, "signInWithPassword")
 }

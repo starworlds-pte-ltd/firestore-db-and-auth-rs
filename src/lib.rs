@@ -19,6 +19,8 @@ pub use credentials::Credentials;
 pub use sessions::service_account::Session as ServiceSession;
 pub use sessions::user::Session as UserSession;
 
+use std::sync::{Arc, Mutex};
+
 /// Authentication trait.
 ///
 /// This trait is implemented by [`crate::sessions`].
@@ -31,9 +33,9 @@ pub trait FirebaseAuthBearer {
     fn project_id(&self) -> &str;
     /// An access token. If a refresh token is known and the access token expired,
     /// the implementation should try to refresh the access token before returning.
-    fn access_token(&self) -> String;
+    fn access_token(&self) -> Arc<Mutex<String>>;
     /// The access token, unchecked. Might be expired or in other ways invalid.
-    fn access_token_unchecked(&self) -> String;
+    fn access_token_unchecked(&self) -> Arc<Mutex<String>>;
     /// The reqwest http client.
     /// The `Client` holds a connection pool internally, so it is advised that it is reused for multiple, successive connections.
     fn client(&self) -> &reqwest::blocking::Client;

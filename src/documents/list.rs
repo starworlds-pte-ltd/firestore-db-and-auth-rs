@@ -58,7 +58,7 @@ fn get_new_data<'a>(
     let resp = auth
         .client()
         .get(url)
-        .bearer_auth(auth.access_token().to_owned())
+        .bearer_auth(auth.access_token().lock().unwrap().to_owned())
         .send()?;
 
     let resp = extract_google_api_error(resp, || collection_id.to_owned())?;

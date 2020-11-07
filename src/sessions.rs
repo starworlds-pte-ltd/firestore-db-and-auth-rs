@@ -5,16 +5,16 @@
 use super::credentials;
 use super::errors::{extract_google_api_error, FirebaseError};
 use super::jwt::{
-    create_jwt, is_expired, jwt_update_expiry_if, verify_access_token, AuthClaimsJWT, JWT_AUDIENCE_FIRESTORE,
-    JWT_AUDIENCE_IDENTITY,
+    create_jwt, is_expired, jwt_update_expiry_if, verify_access_token, AuthClaimsJWT,
+    JWT_AUDIENCE_FIRESTORE, JWT_AUDIENCE_IDENTITY,
 };
 use super::FirebaseAuthBearer;
 
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::ops::Deref;
 use std::slice::Iter;
+use std::sync::{Arc, Mutex};
 
 pub mod user {
     use super::*;
@@ -43,7 +43,7 @@ pub mod user {
         pub refresh_token: Option<String>,
         /// The firebase projects API key, as defined in the credentials object
         pub api_key: String,
-        access_token_: RefCell<String>,
+        access_token_: Arc<Mutex<String>>,
         project_id_: String,
         /// The http client. Replace or modify the client if you have special demands like proxy support
         pub client: reqwest::blocking::Client,
@@ -59,25 +59,26 @@ pub mod user {
         /// This method will automatically refresh your access token, if it has expired.
         ///
         /// If the refresh failed, this will
-        fn access_token(&self) -> String {
-            let jwt = self.access_token_.borrow();
+        fn access_token(&self) -> Arc<Mutex<String>> {
+            let jwt = self.access_token_.lock().unwrap();
             let jwt = jwt.as_str();
 
             if is_expired(&jwt, 0).unwrap() {
                 // Unwrap: the token is always valid at this point
-                if let Ok(response) = get_new_access_token(&self.api_key, jwt) {
-                    self.access_token_.swap(&RefCell::new(response.id_token.clone()));
-                    return response.id_token;
+                return if let Ok(response) = get_new_access_token(&self.api_key, jwt) {
+                    *self.access_token_.lock().unwrap() = response.id_token.clone();
+                    Arc::new(Mutex::new(response.id_token))
+                // TODO: これで大丈夫？？？
                 } else {
                     // Failed to refresh access token. Return an empty string
-                    return String::new();
-                }
+                    Arc::new(Mutex::new(String::new()))
+                };
             }
-            jwt.to_owned()
+            Arc::new(Mutex::new(jwt.to_owned()))
         }
 
-        fn access_token_unchecked(&self) -> String {
-            self.access_token_.borrow().clone()
+        fn access_token_unchecked(&self) -> Arc<Mutex<String>> {
+            Arc::clone(&self.access_token_)
         }
 
         fn client(&self) -> &reqwest::blocking::Client {
@@ -95,7 +96,10 @@ pub mod user {
         api_key: &str,
         refresh_token: &str,
     ) -> Result<RefreshTokenToAccessTokenResponse, FirebaseError> {
-        let request_body = vec![("grant_type", "refresh_token"), ("refresh_token", refresh_token)];
+        let request_body = vec![
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token),
+        ];
 
         let url = refresh_to_access_endpoint(api_key);
         let client = reqwest::blocking::Client::new();
@@ -197,11 +201,15 @@ pub mod user {
         /// - `refresh_token` A refresh token.
         ///
         /// Async support: This is a blocking operation.
-        pub fn by_refresh_token(credentials: &Credentials, refresh_token: &str) -> Result<Session, FirebaseError> {
-            let r: RefreshTokenToAccessTokenResponse = get_new_access_token(&credentials.api_key, refresh_token)?;
+        pub fn by_refresh_token(
+            credentials: &Credentials,
+            refresh_token: &str,
+        ) -> Result<Session, FirebaseError> {
+            let r: RefreshTokenToAccessTokenResponse =
+                get_new_access_token(&credentials.api_key, refresh_token)?;
             Ok(Session {
                 user_id: r.user_id,
-                access_token_: RefCell::new(r.id_token),
+                access_token_: Arc::new(Mutex::new(r.id_token)),
                 refresh_token: Some(r.refresh_token),
                 project_id_: credentials.project_id.to_owned(),
                 api_key: credentials.api_key.clone(),
@@ -237,7 +245,9 @@ pub mod user {
                 .keys
                 .secret
                 .as_ref()
-                .ok_or(FirebaseError::Generic("No private key added via add_keypair_key!"))?;
+                .ok_or(FirebaseError::Generic(
+                    "No private key added via add_keypair_key!",
+                ))?;
             let encoded = jwt.encode(&secret.deref())?.encoded()?.encode();
 
             let resp = reqwest::blocking::Client::new()
@@ -249,7 +259,7 @@ pub mod user {
 
             Ok(Session {
                 user_id: user_id.to_owned(),
-                access_token_: RefCell::new(r.idToken),
+                access_token_: Arc::new(Mutex::new(r.idToken)),
                 refresh_token: r.refreshToken,
                 project_id_: credentials.project_id.to_owned(),
                 api_key: credentials.api_key.clone(),
@@ -258,12 +268,15 @@ pub mod user {
             })
         }
 
-        pub fn by_access_token(credentials: &Credentials, firebase_tokenid: &str) -> Result<Session, FirebaseError> {
+        pub fn by_access_token(
+            credentials: &Credentials,
+            firebase_tokenid: &str,
+        ) -> Result<Session, FirebaseError> {
             let result = verify_access_token(&credentials, firebase_tokenid)?;
             Ok(Session {
                 user_id: result.subject,
                 project_id_: result.audience,
-                access_token_: RefCell::new(firebase_tokenid.to_owned()),
+                access_token_: Arc::new(Mutex::new(firebase_tokenid.to_owned())),
                 refresh_token: None,
                 api_key: credentials.api_key.clone(),
                 client: reqwest::blocking::Client::new(),
@@ -279,7 +292,6 @@ pub mod service_account {
     use credentials::Credentials;
 
     use chrono::Duration;
-    use std::cell::RefCell;
     use std::ops::Deref;
 
     /// Service account session
@@ -290,34 +302,33 @@ pub mod service_account {
         pub client: reqwest::blocking::Client,
         /// The http client for async operations. Replace or modify the client if you have special demands like proxy support
         pub client_async: reqwest::Client,
-        jwt: RefCell<AuthClaimsJWT>,
-        access_token_: RefCell<String>,
+        jwt: Arc<Mutex<AuthClaimsJWT>>,
+        access_token_: Arc<Mutex<String>>,
     }
 
     impl super::FirebaseAuthBearer for Session {
         fn project_id(&self) -> &str {
             &self.credentials.project_id
         }
+
         /// Return the encoded jwt to be used as bearer token. If the jwt
         /// issue_at is older than 50 minutes, it will be updated to the current time.
-        fn access_token(&self) -> String {
-            let mut jwt = self.jwt.borrow_mut();
-
-            if jwt_update_expiry_if(&mut jwt, 50) {
+        fn access_token(&self) -> Arc<Mutex<String>> {
+            if jwt_update_expiry_if(Arc::clone(&self.jwt), 50) {
                 if let Some(secret) = self.credentials.keys.secret.as_ref() {
-                    if let Ok(v) = self.jwt.borrow().encode(&secret.deref()) {
+                    if let Ok(v) = self.jwt.lock().unwrap().encode(&secret.deref()) {
                         if let Ok(v2) = v.encoded() {
-                            self.access_token_.swap(&RefCell::new(v2.encode()));
+                            *self.access_token_.lock().unwrap() = v2.encode();
                         }
                     }
                 }
             }
 
-            self.access_token_.borrow().clone()
+            Arc::clone(&self.access_token_)
         }
 
-        fn access_token_unchecked(&self) -> String {
-            self.access_token_.borrow().clone()
+        fn access_token_unchecked(&self) -> Arc<Mutex<String>> {
+            Arc::clone(&self.access_token_)
         }
 
         fn client(&self) -> &reqwest::blocking::Client {
@@ -353,12 +364,14 @@ pub mod service_account {
                 .keys
                 .secret
                 .as_ref()
-                .ok_or(FirebaseError::Generic("No private key added via add_keypair_key!"))?;
+                .ok_or(FirebaseError::Generic(
+                    "No private key added via add_keypair_key!",
+                ))?;
             let encoded = jwt.encode(&secret.deref())?.encoded()?.encode();
 
             Ok(Session {
-                access_token_: RefCell::new(encoded),
-                jwt: RefCell::new(jwt),
+                access_token_: Arc::new(Mutex::new(encoded)),
+                jwt: Arc::new(Mutex::new(jwt)),
                 credentials,
                 client: reqwest::blocking::Client::new(),
                 client_async: reqwest::Client::new(),
