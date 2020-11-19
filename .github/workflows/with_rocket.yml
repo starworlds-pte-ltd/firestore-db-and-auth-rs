@@ -1,18 +1,14 @@
 name: With Rocket
 
-on:
-  push:
-    paths:
-      - 'src'
+on: [ push ]
 
 jobs:
   build:
-
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest]
-        rust: [nightly]
+        os: [ ubuntu-latest, macOS-latest ]
+        rust: [ nightly ]
 
     steps:
     - uses: hecrj/setup-rust-action@master
