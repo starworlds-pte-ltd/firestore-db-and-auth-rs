@@ -23,7 +23,8 @@ struct DemoDTOPartial {
 
 #[test]
 fn service_account_session() -> errors::Result<()> {
-    let cred = credentials::Credentials::from_file("firebase-service-account.json").expect("Read credentials file");
+    let cred = credentials::Credentials::from_file("firebase-service-account.json")
+        .expect("Read credentials file");
     cred.verify()?;
 
     let mut session = ServiceSession::new(cred).unwrap();
@@ -82,7 +83,8 @@ fn service_account_session() -> errors::Result<()> {
 
 #[test]
 fn user_account_session() -> errors::Result<()> {
-    let cred = credentials::Credentials::from_file("firebase-service-account.json").expect("Read credentials file");
+    let cred = credentials::Credentials::from_file("firebase-service-account.json")
+        .expect("Read credentials file");
 
     println!("Refresh token from file");
     // Read refresh token from file if possible instead of generating a new refresh token each time
@@ -100,7 +102,10 @@ fn user_account_session() -> errors::Result<()> {
     println!("Generate new user auth token");
     let user_session: sessions::user::Session = if refresh_token.is_empty() {
         let session = sessions::user::Session::by_user_id(&cred, TEST_USER_ID, true)?;
-        std::fs::write("refresh-token-for-tests.txt", &session.refresh_token.as_ref().unwrap())?;
+        std::fs::write(
+            "refresh-token-for-tests.txt",
+            &session.refresh_token.as_ref().unwrap(),
+        )?;
         session
     } else {
         println!("user::Session::by_refresh_token");
@@ -111,7 +116,8 @@ fn user_account_session() -> errors::Result<()> {
     assert_eq!(user_session.project_id(), cred.project_id);
 
     println!("user::Session::by_access_token");
-    let user_session = sessions::user::Session::by_access_token(&cred, &user_session.access_token_unchecked())?;
+    let user_session =
+        sessions::user::Session::by_access_token(&cred, &user_session.access_token_unchecked())?;
 
     assert_eq!(user_session.user_id, TEST_USER_ID);
 
@@ -196,7 +202,14 @@ fn user_account_session() -> errors::Result<()> {
 
     println!("user::Session documents::query for f64");
     let f: f64 = 13.37;
-    let count = documents::query(&user_session, "tests", f.into(), dto::FieldOperator::EQUAL, "a_float")?.count();
+    let count = documents::query(
+        &user_session,
+        "tests",
+        f.into(),
+        dto::FieldOperator::EQUAL,
+        "a_float",
+    )?
+    .count();
     assert_eq!(count, 0);
 
     Ok(())
