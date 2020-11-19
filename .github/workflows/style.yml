@@ -1,12 +1,9 @@
 name: Code Style
 
-on:
-  pull_request:
-  push:
+on: [ push, pull_request ]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
