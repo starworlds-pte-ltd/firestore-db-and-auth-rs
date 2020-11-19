@@ -1,7 +1,7 @@
 [package]
 name = "firestore-db-and-auth"
 version = "0.6.0"
-authors = ["David Gräff <david.graeff@web.de>"]
+authors = ["David Gräff <david.graeff@web.de>", "Ken Matsui <26405363+ken-matsui@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT"
 description = "This crate allows easy access to your Google Firestore DB via service account or OAuth impersonated Google Firebase Auth credentials."
