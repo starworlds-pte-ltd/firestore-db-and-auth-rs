@@ -8,7 +8,6 @@ description = "This crate allows easy access to your Google Firestore DB via ser
 readme = "readme.md"
 keywords = ["firestore", "auth"]
 categories = ["api-bindings","authentication"]
-maintenance = { status = "passively-maintained" }
 repository = "https://github.com/davidgraeff/firestore-db-and-auth-rs"
 
 [dependencies]
@@ -38,3 +37,7 @@ native-tls = ["reqwest/native-tls"]
 native-tls-vendored = ["reqwest/native-tls-vendored"]
 unstable = []
 external_doc = []
+
+[badges]
+maintenance = { status = "passively-maintained" }
+
